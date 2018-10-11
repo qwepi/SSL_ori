@@ -84,7 +84,7 @@ opt_cnn_clust    = optimizer.minimize(loss+C_loss, gs)
 opt_cnn    = optimizer.minimize(loss, gs)
 lr     = 0.001 #initial learning rate and lr decay
 dr     = 0.65 #learning rate decay rate
-maxitr = 10000 # training steps for MTNN
+maxitr = 301 # training steps for MTNN
 maxitr_un = 301 # training steps for selecting unlabeled samples
 bs     = 32   #training batch size
 c_step = 1000 #display step
@@ -351,19 +351,95 @@ with tf.Session(config=config) as sess:
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './unlossfix_test/unlossfix-testDkl-m10000-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
-        np.savetxt(txtname,un_wholetest)
-        print("un_wholetest save to ", txtname)
+        #txtname = './unlossfix_test/unlossfix-testDkl-m10000un-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        #np.savetxt(txtname,un_wholetest)
+        #print("un_wholetest save to ", txtname)
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
         un_batches = [un_wholeXYwl[k:k+num_k] for k in range(0, len(un_wholeXYwl), num_k)]
+        for un_batch in range(len(un_batches)):
+            txtname = './unlossfix_test/unlossfix-testsubset-unbatch%d-benchmard%d-p%g-s%d-t%d.txt'%(un_batch,bB,train_ratio,seed,t)
+            np.savetxt(txtname,un_batches[un_batch])
+            print("un_batch save to ", txtname)
+      
         un_for_r = []
         un_for_r_acc = []
-        bar = Bar('training model with unlabeled data to define r', max=num_S)
+        bar = Bar('training model with unlabeled data to sort subset', max=num_S)
         for i in range(num_S):
             print("use unlabeled data to train CNC:", i)
-            un_for_r = un_for_r + un_batches[i]
-            unX_r,un_p_r, un_weight_r = get_data_un_r(un_for_r)
+            #Ying 
+            #cal acc on each subset, then sort again, then do the select thing as before
+            unX_r, un_p_r, un_weight_r = get_data_un_r(un_batches[i])
+            unX_r = np.array(unX_r)
+            un_p_r = np.array(un_p_r)
+            un_weight_r = np.array(un_weight_r)
+            sess.run(global_variables_initializer)
+            for step in xrange(maxitr_un):
+                batch = get_batch_withweight(unX_r,un_p_r,un_weight_r,bs)
+                batch_data = batch[0]
+                batch_label= batch[1]
+                batch_wi   = batch[2]
+                batch_label_all_without_bias = processlabel(batch_label)
+                pc_labeled = pairwise_constraint(batch_data,batch_label)
+                feed_dict = {x_data: batch_data, y_gt: batch_label_all_without_bias, W:batch_wi, P:pc_labeled, lr_holder:lr, fortest:0}
+                training_loss, training_acc, _ = sess.run([loss, accu, opt_cnn_clust], feed_dict=feed_dict)
+                learning_rate = lr
+                if step % b_step == 0 and step >0:
+                    lr = lr * dr
+            #get labeled acc based on unlabeled data set,use the one with minimum loss
+            chs = 0   #correctly predicted hs
+            cnhs= 0   #correctly predicted nhs
+            ahs = 0   #actual hs
+            anhs= 0   #actual hs
+            start   = time.time()
+            num = 0
+            for titr in xrange(0, len(trainX)/bs+1):
+                if not titr == len(trainX)/bs:
+                    tbatch,num = batchfor_test(trainX,trainY,num,bs)
+                else:
+                    if not len(trainX)-titr*bs ==0:
+                        tbatch,num = batchfor_test(trainX,trainY,num,len(trainX)-titr*bs)
+                    else:
+                        break
+                tdata = tbatch[0]
+                tlabel= tbatch[1]
+                tmp_y = y.eval(feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
+                tmp_label= np.argmax(tlabel, axis=1)
+                tmp      = tmp_label+tmp_y
+                chs += sum(tmp==2)
+                cnhs+= sum(tmp==0)
+                ahs += sum(tmp_label)
+                anhs+= sum(tmp_label==0)
+            print chs, ahs, cnhs, anhs
+            if not ahs ==0:
+                hs_accu = 1.0*chs/ahs
+            else:
+                hs_accu = 0
+            acc_whole = 1.0*(chs+cnhs)/(ahs+anhs)
+            un_for_r_acc.append(acc_whole)
+            bar.next()
+        bar.finish()
+        print("for %f labeled data" % (len(trainX)),", un_for_r =", un_for_r_acc)
+        # sort un_for_r based on acc 
+        # then sort un_batches based on acc 
+        un_for_r_acc_with_batches = list(zip(un_for_r_acc,un_batches))
+        un_for_r_acc_with_batches.sort(key = lambda x:x[0])
+
+
+        bar = Bar('training model with unlabeled data to define selected unlabeled samples', max=num_S)
+        un_for_r = []
+        un_for_r_acc = []
+        for i in range(num_S):
+            print("use unlabeled data to train CNC:", i)
+           #un_for_r = un_for_r + un_batches[i]
+            if not i ==0:
+                un_for_r.append(un_for_r[i-1]+un_batches[i])
+                if i ==1:
+                    pdb.set_trace()
+            else:
+                un_for_r.append(un_batches[i])
+                pdb.set_trace()
+            unX_r,un_p_r, un_weight_r = get_data_un_r(un_for_r[i])
             unX_r = np.array(unX_r)
             un_p_r = np.array(un_p_r)
             un_weight_r = np.array(un_weight_r)
@@ -420,7 +496,27 @@ with tf.Session(config=config) as sess:
             if not un_for_r_acc[i] < r_max:
                 r_max = un_for_r_acc[i]
                 r_index = i
-        print("r_max =%f, r_index =%d" % (r_max,r_index))
+        print("r_acc_max =%f, r_index =%d" % (r_max,r_index))
+        #Ying
+        #choose selected subset for next training
+        unX_next,un_p_r_next, un_weight_r_next = get_data_un_r(un_for_r[r_index])
+        unlabel_fortrain = list(zip(unX_next,un_p_r_next))
+        w_un_fortrain = un_weight_r_next
+        newdata_fortrain = train_original + unlabel_fortrain
+        print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
+        newdata_fortrain = data_flatten2(newdata_fortrain)
+        newdataX, newdataY = data_split_sencond(newdata_fortrain)
+        len_trainingX = len(trainX)
+        w_new = np.ones(len_trainingX).tolist() + w_un_fortrain
+        print("%d data totally are used" % (len(newdataX)))
+        trainX1 = np.array(newdataX)
+        trainY1 = np.array(newdataY)
+        weight_train = np.array(data_flatten2(w_new))
+        print("round ok at",t+1)
+        print('\n')
+print("training time is(seconds):", time.time()-t1)
+            
+''''       
         r = un_batches[r_index][-1][v_num]
         r_al_num = int(len(unX)*al_ratio/(2**t))+1
         print("r_al_num = ", r_al_num)
@@ -507,4 +603,4 @@ with tf.Session(config=config) as sess:
         print('\n')
 print("training time is(seconds):", time.time()-t1)
     
-    
+''''    
