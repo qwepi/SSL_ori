@@ -84,7 +84,7 @@ opt_cnn_clust    = optimizer.minimize(loss+C_loss, gs)
 opt_cnn    = optimizer.minimize(loss, gs)
 lr     = 0.001 #initial learning rate and lr decay
 dr     = 0.65 #learning rate decay rate
-maxitr = 10000 # training steps for MTNN
+maxitr = 301 # training steps for MTNN
 maxitr_un = 301 # training steps for selecting unlabeled samples
 bs     = 32   #training batch size
 c_step = 1000 #display step
@@ -153,6 +153,57 @@ with tf.Session(config=config) as sess:
         print('Ordinary Accuracy is %f' %acc_ordinary)
         print('Test Runtime is %f seconds'%(end-start))
  
+    def run_train_clu(trainX,trainY):
+        chs = 0
+        cnhs= 0   #correctly predicted nhs
+        ahs = 0   #actual hs
+        anhs= 0   #actual hs
+        start   = time.time()
+        num = 0
+        for titr in xrange(0, len(trainX)/bs+1):
+            if not titr == len(trainX)/bs:
+                #tbatch = test_data.nextbatch(1000, fealen)
+                tbatch,num = batchfor_test(trainX,trainY,num,bs)
+            else:
+                if not len(trainX)-titr*bs ==0:
+                #tbatch = test_data.nextbatch(test_data.testlen-titr*1000, fealen)
+                    tbatch,num = batchfor_test(trainX,trainY,num,len(trainX)-titr*bs)
+                else:
+                    break
+            tdata = tbatch[0]
+            tlabel= tbatch[1]
+            #tmp_y = y.eval(feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
+            #Ying
+            tmp_y,unloss_batch, predict1_train, Dkl_train = sess.run([y,loss_w,predict1,D_kl],feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
+            pdb.set_trace()
+            tmp_label= np.argmax(tlabel, axis=1)
+            pc_train_batch = pairwise_constraint(tdata,tmp_label)
+            Dkl_np_train_batch, closs_train_batch = get_Dkl_C(predict1_train,pc_train_batch)
+            wi_np_train_batch = get_wi(Dkl_np_train_batch,pc_train_batch)
+            vloss_batch = wi_np_train_batch*unloss_batch
+            pdb.set_trace()
+            #tmp_label= np.argmax(tlabel, axis=1)
+            tmp      = tmp_label+tmp_y
+            chs += sum(tmp==2)
+            cnhs+= sum(tmp==0)
+            ahs += sum(tmp_label)
+            anhs+= sum(tmp_label==0)
+        print('For training data:')
+        print chs, ahs, cnhs, anhs
+        if not ahs ==0:
+            hs_accu = 1.0*chs/ahs
+        else:
+            hs_accu = 0
+        fs      = anhs - cnhs
+        end       = time.time()
+        acc_ordinary = 1.0*(chs+cnhs)/(ahs+anhs)
+        print ahs, anhs
+        print('(training)Hotspot Detection Accuracy is %f'%hs_accu)
+        print('False Alarm is %f'%fs)
+        print('Ordinary Accuracy is %f' %acc_ordinary)
+        print('Test Runtime is %f seconds'%(end-start))
+ 
+
     def run_test():
         chs = 0   #correctly predicted hs
         cnhs= 0   #correctly predicted nhs
@@ -256,7 +307,7 @@ with tf.Session(config=config) as sess:
             if step % b_step == 0 and step >0:
                 lr = lr * dr
         
-        run_train(trainX,trainY)
+        run_train_clu(trainX,trainY)
         run_test()
         if t ==t_num-1:
             path = "%smodel-p%g-s%d-step%d.ckpt" % (save_path, train_ratio, seed, step)
@@ -351,8 +402,9 @@ with tf.Session(config=config) as sess:
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './unlossfix_test/unlossfix-testDkl-m10000-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
-        np.savetxt(txtname,un_wholetest)
+        txtname = './unlossfix_test/unlossfix-testDkl-trainclu-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        pdb.set_trace()
+        #np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
