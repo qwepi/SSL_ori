@@ -10,11 +10,13 @@ numpy, tensorflow (tested on 1.3 and 1.9), pandas, json, ConfigParser, progress
 
 ## Train
 
-e.g. to train iccad2 with 10% labeled samples, you need to modify iccad2\_config.ini
+e.g. to train iccad2 with 10% labeled samples (random seed =50), you need to modify iccad2\_config.ini
 
 set ```save_path=./models/iccad2/ssl/```
 
-set ```train_ratio=0.1``` and 
+set ```train_ratio=0.1``` 
+
+set ```seed=50``` and 
 
 ```python train_SSL.py iccad2_config.ini```
 
