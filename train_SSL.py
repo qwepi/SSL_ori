@@ -29,7 +29,6 @@ test_path   = infile.get('dir','test_path')
 save_path = infile.get('dir','save_path')
 fealen     = int(infile.get('feature','ft_length'))
 blockdim   = int(infile.get('feature','block_dim'))
-aug   = int(infile.get('feature','aug'))
 train_ratio = float(infile.get('feature', 'train_ratio'))
 seed = int(infile.get('feature', 'seed'))
 bB = int(infile.get('feature','b'))
@@ -63,9 +62,7 @@ fortest= tf.placeholder(tf.int32, name="fortest")# whether the forward_crosstask
 
 x = x_data
 
-if aug==1:
-    predict, predict1 = forward_crosstask(x, flip=True)   
-elif fortest == 0:
+if fortest == 0:
     predict,predict1 = forward_crosstask(x)
 else:
     predict,predict1 = forward_crosstask(x, is_training = False)
@@ -87,7 +84,7 @@ dr     = 0.65 #learning rate decay rate
 maxitr = 10000 # training steps for MTNN
 maxitr_un = 301 # training steps for selecting unlabeled samples
 bs     = 32   #training batch size
-c_step = 1000 #display step
+c_step = 2000 #display step
 b_step = 3200 #lr decay step
 t_step = 10000 #total step
 num_S = 15 #unlabeled data subset number
@@ -96,7 +93,6 @@ v_num = 4 # use whether un_loss(3) or v_loss(4) to sort unlabeled data subset
 un_loss_based = 0 # use whether un_loss(1) or v_loss(0) to sort unlabeled data subset
 ckpt   = True#set true to save trained models.
 
-l_step =2000
 '''
 Start the training
 '''
@@ -148,19 +144,9 @@ with tf.Session(config=config) as sess:
             feed_dict = {x_data: batch_data, y_gt: batch_label_all_with_bias, W:batch_wi, P: pc_labeled, lr_holder:lr, fortest:0}
             opt_cnn_clust.run(feed_dict = feed_dict)
             learning_rate = lr
-            if not t ==t_num-1:
-                if step % l_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
-
-            if t ==t_num-1:
-                if step % c_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
-            if train_ratio == 1:
-                if step % c_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
+            if step % c_step == 0 and step >0:
+                format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
+                print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
             if step % b_step == 0 and step >0:
                 lr = lr * dr
         
@@ -223,7 +209,7 @@ with tf.Session(config=config) as sess:
         bar = Bar('training model with unlabeled data to define r', max=num_S)
         for i in range(num_S):
             lr = 0.001
-            print("use unlabeled data to train CNC:", i)
+            print("use unlabeled data to train model:", i)
             un_for_r = un_for_r + un_batches[i]
             unX_r,un_p_r, un_weight_r = get_data_un_r(un_for_r)
             unX_r = np.array(unX_r)

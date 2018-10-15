@@ -84,7 +84,7 @@ opt_cnn_clust    = optimizer.minimize(loss+C_loss, gs)
 opt_cnn    = optimizer.minimize(loss, gs)
 lr     = 0.001 #initial learning rate and lr decay
 dr     = 0.65 #learning rate decay rate
-maxitr = 301 # training steps for MTNN
+maxitr = 10000 # training steps for MTNN
 maxitr_un = 301 # training steps for selecting unlabeled samples
 bs     = 32   #training batch size
 c_step = 1000 #display step
@@ -98,7 +98,7 @@ un_loss_based = 0 # use whether un_loss(1) or v_loss(0) to sort unlabeled data s
 ifISPL = 0 # use ISPL(1) or not(0)
 ckpt   = True#set true to save trained models.
 
-l_step =100
+l_step =2000
 '''
 Start the training
 '''
@@ -175,13 +175,13 @@ with tf.Session(config=config) as sess:
             #tmp_y = y.eval(feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
             #Ying
             tmp_y,unloss_batch, predict1_train, Dkl_train = sess.run([y,loss_w,predict1,D_kl],feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
-            pdb.set_trace()
+            #pdb.set_trace()
             tmp_label= np.argmax(tlabel, axis=1)
             pc_train_batch = pairwise_constraint(tdata,tmp_label)
             Dkl_np_train_batch, closs_train_batch = get_Dkl_C(predict1_train,pc_train_batch)
             wi_np_train_batch = get_wi(Dkl_np_train_batch,pc_train_batch)
             vloss_batch = wi_np_train_batch*unloss_batch
-            pdb.set_trace()
+            #pdb.set_trace()
             #tmp_label= np.argmax(tlabel, axis=1)
             tmp      = tmp_label+tmp_y
             chs += sum(tmp==2)
@@ -307,14 +307,19 @@ with tf.Session(config=config) as sess:
             if step % b_step == 0 and step >0:
                 lr = lr * dr
         
-        run_train_clu(trainX,trainY)
-        run_test()
+        #run_train(trainX,trainY)
+        if seed == 150:
+            if not t == t_num-1:
+                if not train_ratio ==1:
+                    run_test()
+        #if not t ==0:
+            #run_test()
         if t ==t_num-1:
             path = "%smodel-p%g-s%d-step%d.ckpt" % (save_path, train_ratio, seed, step)
             print("save to path:", path)
             saver.save(sess, path)
             print("all three iteration are done" )
-            #run_test()
+            run_test()
             break
       
         if train_ratio ==1:
@@ -397,14 +402,14 @@ with tf.Session(config=config) as sess:
         #define r and choose data for next iteration
         #training model(need X, predict Y and weight)
         #Ying
-        lr = 0.001
+        #lr = 0.001
         un_v_loss = wi*un_loss1
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './unlossfix_test/unlossfix-testDkl-trainclu-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
-        pdb.set_trace()
-        #np.savetxt(txtname,un_wholetest)
+        txtname = './unlossfix_test/unlossfix-testDkl-m10000-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        #pdb.set_trace()
+        np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
@@ -413,6 +418,8 @@ with tf.Session(config=config) as sess:
         un_for_r_acc = []
         bar = Bar('training model with unlabeled data to define r', max=num_S)
         for i in range(num_S):
+            #Ying
+            lr = 0.001
             print("use unlabeled data to train CNC:", i)
             un_for_r = un_for_r + un_batches[i]
             unX_r,un_p_r, un_weight_r = get_data_un_r(un_for_r)
