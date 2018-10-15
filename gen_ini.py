@@ -14,11 +14,11 @@ train_path = ./benchmarks/BENCHMARK/train
 test_path  = ./benchmarks/BENCHMARK/test
 
 #path to save model
-#save_path  = ./models/BENCHMARK/bbl/
+#save_path  = ./models/BENCHMARK/unlossfix_SSL_m10000_p0.1_seed50/
 save_path = SAVE_PATH
 
 #path to trained model
-
+#model_path = ./models/BENCHMARK/unlossfix_SSL_m10000_p0.1_seed50/model-p0.1-s50-step9999.ckpt
 model_path = MODEL_PATH
 
 [feature]
