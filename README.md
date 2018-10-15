@@ -14,13 +14,7 @@ e.g. to train iccad2 with 10% labeled samples, you need to modify iccad2\_config
 
 set ```save_path=./models/iccad2/ssl/```
 
-set ```aug=0```
-
-set ```train_ratio=0.1```
-
-set ```aug=0```
-
-and 
+set ```train_ratio=0.1``` and 
 
 ```python train_SSL_release.py iccad2_config.ini```
 
@@ -28,9 +22,7 @@ and
 
 e.g. to test iccad2, you need to modify iccad1\_config.ini
 
-set ```model_path=./models/iccad2/ssl/model.ckpt```
-
-set ```aug=0``` and
+set ```model_path=./models/iccad2/ssl/model.ckpt```  and
 
 ```python train_SSL.py iccad2_config.ini```
 
