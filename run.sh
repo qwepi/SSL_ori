@@ -1,18 +1,18 @@
 
-'''	
+:<<!EOF!
 	Batch processing for training and testing:
 	b: benchmark number
 	train_p: ratio of selected labeled samples
 	seed: random seed
 	log_SSL: folder to store log files 
-'''
+!EOF!
 
 
 mkdir -p log_SSL
 
-for b in 4; do
-for train_p in 0.3 0.5 0.7 0.9; do 
-for seed in 50 100 150 200 250; do 
+for b in 2; do
+for train_p in 0.1; do 
+for seed in 50; do 
     ini="iccad${b}_config.ini"
 
     python gen_ini.py ${b} ${train_p} ${seed} ${ini}

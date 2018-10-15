@@ -198,9 +198,7 @@ with tf.Session(config=config) as sess:
       
         print("*******get unlabeled data for next training, %d round*******" % num_S)
         #define r and choose data for next iteration
-        un_v_loss = wi*un_loss1
-        un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
-        un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
+        un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,loss_v))
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
         un_batches = [un_wholeXYwl[k:k+num_k] for k in range(0, len(un_wholeXYwl), num_k)]
