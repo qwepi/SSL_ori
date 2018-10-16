@@ -6,7 +6,21 @@ Feature Tensor Extraction Data is already within this repo, original images can 
 
 ## Dependencies
 
-numpy, tensorflow (tested on 1.3 and 1.9), pandas, json, ConfigParser, progress
+numpy, tensorflow (tested on 1.5), pandas, json, ConfigParser, progress
+
+## Test on Released Models
+
+e.g. to test iccad2, ratio = 10%, random seed = 50, you need to modify iccad2\_config.ini
+
+set ```model_path=./models/iccad2/unlossfix_SSL_m10000_p0.1s50/model-p0.1-s100-step9999.ckpt```  
+
+set ```train_ratio=0.1``` 
+
+set ```seed=50``` 
+
+set ```b=2``` and
+
+```python test_SSL.py iccad2_config.ini```
 
 ## Train
 
@@ -16,7 +30,9 @@ set ```save_path=./models/iccad2/ssl/```
 
 set ```train_ratio=0.1``` 
 
-set ```seed=50``` and 
+set ```seed=50```
+
+set ```b=2``` and
 
 ```python train_SSL.py iccad2_config.ini```
 
@@ -24,7 +40,13 @@ set ```seed=50``` and
 
 e.g. to test iccad2, you need to modify iccad2\_config.ini
 
-set ```model_path=./models/iccad2/ssl/model.ckpt```  and
+set ```model_path=./models/iccad2/ssl/model.ckpt```(note: This model path is where you save your model when training)  
+
+set ```train_ratio=0.1``` 
+
+set ```seed=50```
+
+set ```b=2``` and
 
 ```python test_SSL.py iccad2_config.ini```
 
