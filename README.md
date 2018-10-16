@@ -10,9 +10,9 @@ numpy, tensorflow (tested on 1.5), pandas, json, ConfigParser, progress
 
 ## Test on Released Models
 
-e.g. to test iccad2, ratio = 10%, random seed = 50, you need to modify iccad2\_config.ini
+e.g. to test iccad2 with 10% labeled samples (random seed = 50) on released model, you need to modify iccad2\_config.ini
 
-set ```model_path=./models/iccad2/unlossfix_SSL_m10000_p0.1s50/model-p0.1-s100-step9999.ckpt```  
+set ```model_path=./models/iccad2/unlossfix_SSL_m10000_p0.1s50/model-p0.1-s50-step9999.ckpt```  
 
 set ```train_ratio=0.1``` 
 
@@ -40,7 +40,7 @@ set ```b=2``` and
 
 e.g. to test iccad2, you need to modify iccad2\_config.ini
 
-set ```model_path=./models/iccad2/ssl/model.ckpt```(note: This model path is where you save your model when training)  
+set ```model_path=./models/iccad2/ssl/model.ckpt```(note: This model path should be where you save your model when training)  
 
 set ```train_ratio=0.1``` 
 
