@@ -10,7 +10,7 @@ numpy, tensorflow (tested on 1.5), pandas, json, ConfigParser, progress
 
 ## Test on Released Models
 
-e.g. to test iccad2 with 10% labeled samples (random seed = 50) on released model, you need to modify iccad2\_config.ini
+e.g. to test iccad2 with 10% labeled samples (random seed = 50) on the released model, you need to modify iccad2\_config.ini
 
 set ```model_path=./models/iccad2/unlossfix_SSL_m10000_p0.1s50/model-p0.1-s50-step9999.ckpt```  
 
