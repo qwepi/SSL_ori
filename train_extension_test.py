@@ -259,13 +259,13 @@ with tf.Session(config=config) as sess:
         print('%d round start' % (t+1))
         sess.run(global_variables_initializer)
         lr = 0.001
-        if t ==0:
-            saver.restore(sess, model_path)
+        #if t ==0:
+            #saver.restore(sess, model_path)
         if t ==t_num-1:
             maxitr = t_step
         if train_ratio ==1:
             maxitr = t_step
-        if not t == 0:
+        if not t == 10:
             print("*******cross task training*******")
             for step in xrange(maxitr):
                 batch =  get_batch_withweight_bias(trainX1,trainY1,weight_train,bs)
@@ -323,7 +323,7 @@ with tf.Session(config=config) as sess:
             #break
       
         if not t == t_num-1:
-            if not t ==0:
+            if not t ==10:
                 if not train_ratio ==1:
                     run_test()
         #if not t ==0:
