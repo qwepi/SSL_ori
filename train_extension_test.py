@@ -86,7 +86,7 @@ opt_cnn_clust    = optimizer.minimize(loss+C_loss, gs)
 opt_cnn    = optimizer.minimize(loss, gs)
 lr     = 0.001 #initial learning rate and lr decay
 dr     = 0.65 #learning rate decay rate
-maxitr = 10000 # training steps for MTNN
+maxitr = 301 # training steps for MTNN
 maxitr_un = 301 # training steps for selecting unlabeled samples
 bs     = 32   #training batch size
 c_step = 1000 #display step
@@ -100,7 +100,7 @@ un_loss_based = 0 # use whether un_loss(1) or v_loss(0) to sort unlabeled data s
 ifISPL = 0 # use ISPL(1) or not(0)
 ckpt   = True#set true to save trained models.
 
-l_step =2000
+l_step =100
 '''
 Start the training
 '''
@@ -329,7 +329,7 @@ with tf.Session(config=config) as sess:
         #if not t ==0:
             #run_test()
         if t ==t_num-1:
-            path = "%smodel-p%g-s%d-step%d.ckpt" % (save_path, train_ratio, seed, step)
+            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25.ckpt" % (save_path, train_ratio, seed, step)
             print("save to path:", path)
             saver.save(sess, path)
             print("all three iteration are done" )
@@ -416,30 +416,124 @@ with tf.Session(config=config) as sess:
         #define r and choose data for next iteration
         #training model(need X, predict Y and weight)
         #Ying
-        #lr = 0.001
+        lr = 0.001
         un_v_loss = wi*un_loss1
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './extension_test/extension-test-fixedsubsetnum-m10000-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        txtname = './extension_test/extension-test-hs-inverse-0.25-m10000-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
         #pdb.set_trace()
         np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
-        un_batches = [un_wholeXYwl[k:k+num_k] for k in range(0, len(un_wholeXYwl), num_k)]
+        #un_batches = [un_wholeXYwl[k:k+num_k] for k in range(0, len(un_wholeXYwl), num_k)]
         #Ying
+        #for extension
         #fixed number of selected subset, num =3(means choose 4)
         #cancle the fixed subset number, control the ratio of HS and nonHS
         #?thoughts: maybe all predicted HS are selected, since HS are lower ones, so maybe I can separate those two and select samples based on numbers
-        un_nhX, un_hX, wi_nh, wi_h, loss_nh, loss_h = separate_unlabel(unX,un_p_label,wi,loss_v)
+        #try inverse HS 1/4
+        un_nhX, un_hX, wi_nh, wi_h, vloss_nh, vloss_h = separate_unlabel(unX,un_p_label,wi,loss_v)
         un_h_num = len(un_hX)
         un_nh_num = len(un_nhX)
         print("len(un_hX)=", len(un_hX),"len(un_nhX)", len(un_nhX))
-        whole_un_nh = list(zip(un_nhX,wi_nh,loss_nh))
-        whole_un_nh.sort(key = lambda x:x[2])
-        fix_loss = whole_un_nh[4*un_h_num][-1]
-        r = fix_loss
+        un_nh_Y = np.zeros(un_nh_num)
+        un_h_Y = np.ones(un_h_num)
+        #inverse hs
+        whole_un_h = list(zip(un_hX,un_h_Y,wi_h,vloss_h))
+        whole_un_h.sort(key = lambda x:x[-1])
+        num_inverse = un_h_num * 0.25 /(t+1)
+        print("num_inverse=",num_inverse)
+        whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
+        #whole_un_nh.sort(key = lambda x:x[-1])
+        inverse_whole_un_h = whole_un_h[-num_inverse:-1]
+        inverse_unX, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
+        print("len(inverse_unX)=",len(inverse_unX))
+        inverse_Y = np.zeros(len(inverse_unX))
+        inverse_whole_un_h = list(zip(inverse_unX,inverse_Y,inverse_weight,inverse_vloss))
+        whole_un_nh_new = inverse_whole_un_h + whole_un_nh
+        whole_un_h_new = whole_un_h[0:un_h_num-num_inverse]
+        whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
+        whole_un_afterinverse.sort(key = lambda x:x[-1])
+        
+
+        num_k = int(len(whole_un_afterinverse)/num_S+1)
+        un_batches = [whole_un_afterinverse[k:k+num_k] for k in range(0, len(whole_un_afterinverse), num_k)]
+
+        un_for_r = []
+        un_for_r_acc = []
+        bar = Bar('training model with unlabeled data to define r', max=num_S)
+        for i in range(num_S):
+            #Ying
+            lr = 0.001
+            print("use unlabeled data to train CNN:", i)
+            un_for_r = un_for_r + un_batches[i]
+            unX_r,un_p_r, un_weight_r = get_data_un_r(un_for_r)
+            unX_r = np.array(unX_r)
+            un_p_r = np.array(un_p_r)
+            un_weight_r = np.array(un_weight_r)
+            sess.run(global_variables_initializer)
+            for step in xrange(maxitr_un):
+                batch = get_batch_withweight(unX_r,un_p_r,un_weight_r,bs)
+                batch_data = batch[0]
+                batch_label= batch[1]
+                batch_wi   = batch[2]
+                batch_label_all_without_bias = processlabel(batch_label)
+                pc_labeled = pairwise_constraint(batch_data,batch_label)
+                feed_dict = {x_data: batch_data, y_gt: batch_label_all_without_bias, W:batch_wi, P:pc_labeled, lr_holder:lr, fortest:0}
+                training_loss, training_acc, _ = sess.run([loss, accu, opt_cnn_clust], feed_dict=feed_dict)
+                learning_rate = lr
+                if step % b_step == 0 and step >0:
+                    lr = lr * dr
+            #get labeled acc based on unlabeled data set,use the one with minimum loss
+            chs = 0   #correctly predicted hs
+            cnhs= 0   #correctly predicted nhs
+            ahs = 0   #actual hs
+            anhs= 0   #actual hs
+            start   = time.time()
+            num = 0
+            for titr in xrange(0, len(trainX)/bs+1):
+                if not titr == len(trainX)/bs:
+                    tbatch,num = batchfor_test(trainX,trainY,num,bs)
+                else:
+                    if not len(trainX)-titr*bs ==0:
+                        tbatch,num = batchfor_test(trainX,trainY,num,len(trainX)-titr*bs)
+                    else:
+                        break
+                tdata = tbatch[0]
+                tlabel= tbatch[1]
+                tmp_y = y.eval(feed_dict={x_data: tdata, y_gt:tlabel,  fortest:1})
+                tmp_label= np.argmax(tlabel, axis=1)
+                tmp      = tmp_label+tmp_y
+                chs += sum(tmp==2)
+                cnhs+= sum(tmp==0)
+                ahs += sum(tmp_label)
+                anhs+= sum(tmp_label==0)
+            print chs, ahs, cnhs, anhs
+            if not ahs ==0:
+                hs_accu = 1.0*chs/ahs
+            else:
+                hs_accu = 0
+            acc_whole = 1.0*(chs+cnhs)/(ahs+anhs)
+            un_for_r_acc.append(acc_whole)
+            bar.next()
+        bar.finish()
+        print("for %f labeled data" % (len(trainX)),", un_for_r =", un_for_r_acc)
+        r_max = 0
+        r_index = 0
+        for i in range(len(un_for_r_acc)):
+            if not un_for_r_acc[i] < r_max:
+                r_max = un_for_r_acc[i]
+                r_index = i
+        print("r_max =%f, r_index =%d" % (r_max,r_index))
+
+      
+
+
+
+        #fix_loss = whole_un_nh[int(3.5*un_h_num)][-1]
+        #r = fix_loss *(1+0.4*t)
         
 
         #r_index = 3
