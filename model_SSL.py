@@ -858,3 +858,31 @@ def forward_stopgradient(input, is_training=True, reuse=False, scope='model', fl
             predict1 = slim.fully_connected(net1, 2, activation_fn=None, scope='fc2_1')
     return predict,predict1
 
+#Ying
+#for extension, separate un_nhX and un_hX
+def separate_unlabel(trainX,trainY,weight,loss_v):
+    trainwhole = list(zip(trainX,trainY,weight,loss_v))
+    train_nh_X = []
+    train_h_X = []
+    weight_nh = []
+    weight_h = []
+    loss_nh = []
+    loss_h = []
+    for i in trainwhole:
+        x,y,z,p = i
+        if y == 0:
+            train_nh_X.append(x)
+            weight_nh.append(z)
+            loss_nh.append(p)
+        if y == 1:
+            train_h_X.append(x)
+            weight_h.append(z)
+            loss_h.append(p)
+    train_nh_X = np.array(train_nh_X)
+    train_h_X = np.array(train_h_X)
+    weight_nh = np.array(weight_nh)
+    weight_h = np.array(weight_h)
+    loss_nh = np.array(loss_nh)
+    loss_h = np.array(loss_h)
+    return(train_nh_X, train_h_X,weight_nh,weight_h,loss_nh,loss_h)
+
