@@ -1,4 +1,4 @@
-from model_ISPL import *
+from model_SSL import *
 import ConfigParser as cp
 import sys
 import os
@@ -27,9 +27,11 @@ infile.read(sys.argv[1])
 train_path = infile.get('dir','train_path')
 test_path   = infile.get('dir','test_path')
 save_path = infile.get('dir','save_path')
+#Ying
+model_path = infile.get('dir','model_path')
 fealen     = int(infile.get('feature','ft_length'))
 blockdim   = int(infile.get('feature','block_dim'))
-aug   = int(infile.get('feature','aug'))
+#aug   = int(infile.get('feature','aug'))
 train_ratio = float(infile.get('feature', 'train_ratio'))
 seed = int(infile.get('feature', 'seed'))
 bB = int(infile.get('feature','b'))
@@ -63,9 +65,9 @@ fortest= tf.placeholder(tf.int32, name="fortest")# whether the forward_crosstask
 
 x = x_data
 
-if aug==1:
-    predict, predict1 = forward_crosstask(x, flip=True)   
-elif fortest == 0:
+#if aug==1:
+#    predict, predict1 = forward_crosstask(x, flip=True)   
+if fortest == 0:
     predict,predict1 = forward_crosstask(x)
 else:
     predict,predict1 = forward_crosstask(x, is_training = False)
@@ -257,59 +259,71 @@ with tf.Session(config=config) as sess:
         print('%d round start' % (t+1))
         sess.run(global_variables_initializer)
         lr = 0.001
+        if t ==0:
+            saver.restore(sess, model_path)
         if t ==t_num-1:
             maxitr = t_step
         if train_ratio ==1:
             maxitr = t_step
-        print("*******cross task training*******")
-        for step in xrange(maxitr):
-            batch =  get_batch_withweight_bias(trainX1,trainY1,weight_train,bs)
-            batch_data = batch[0]
-            batch_label= batch[1]
-            batch_wi   = batch[2]
-            batch_nhs  = batch[3]
-            batch_nhs_wi = batch[5]
-            batch_label_all_without_bias = processlabel(batch_label)
-            batch_label_nhs_without_bias = processlabel(batch[4])
-            nhs_loss = loss.eval(feed_dict={x_data: batch_nhs, y_gt: batch_label_nhs_without_bias, W:batch_nhs_wi, fortest:0})
-            if maxitr == t_step:
-                if step < b_step:
-                    delta1 = 0
-                elif step < b_step*2:
-                    delta1 = 0.15
-                else:
-                    delta1 = 0.30
-            else:  
-                if t ==0 or t == t_num-1:
-                    delta1 = loss_to_bias(nhs_loss, 6, threshold=0.3)
-                else:
-                    delta1 = loss_to_bias(nhs_loss, 6, threshold=0.05)
-            batch_label_all_with_bias = processlabel(batch_label, delta1 = delta1)
-            pc_labeled = pairwise_constraint(batch_data,batch_label)
-            feed_dict = {x_data: batch_data, y_gt: batch_label_all_with_bias, W:batch_wi, P: pc_labeled, lr_holder:lr, fortest:0}
-            training_loss, training_acc = sess.run([loss, accu], feed_dict=feed_dict)
-            feed_dict = {x_data: batch_data, y_gt: batch_label_all_with_bias, W:batch_wi, P: pc_labeled, lr_holder:lr, fortest:0}
-            opt_cnn_clust.run(feed_dict = feed_dict)
-            learning_rate = lr
-            if not t ==t_num-1:
-                if step % l_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
+        if not t == 0:
+            print("*******cross task training*******")
+            for step in xrange(maxitr):
+                batch =  get_batch_withweight_bias(trainX1,trainY1,weight_train,bs)
+                batch_data = batch[0]
+                batch_label= batch[1]
+                batch_wi   = batch[2]
+                batch_nhs  = batch[3]
+                batch_nhs_wi = batch[5]
+                batch_label_all_without_bias = processlabel(batch_label)
+                batch_label_nhs_without_bias = processlabel(batch[4])
+                nhs_loss = loss.eval(feed_dict={x_data: batch_nhs, y_gt: batch_label_nhs_without_bias, W:batch_nhs_wi, fortest:0})
+                if maxitr == t_step:
+                    if step < b_step:
+                        delta1 = 0
+                    elif step < b_step*2:
+                        delta1 = 0.15
+                    else:
+                        delta1 = 0.30
+                else:  
+                    if t ==0 or t == t_num-1:
+                        delta1 = loss_to_bias(nhs_loss, 6, threshold=0.3)
+                    else:
+                        delta1 = loss_to_bias(nhs_loss, 6, threshold=0.05)
+                batch_label_all_with_bias = processlabel(batch_label, delta1 = delta1)
+                pc_labeled = pairwise_constraint(batch_data,batch_label)
+                feed_dict = {x_data: batch_data, y_gt: batch_label_all_with_bias, W:batch_wi, P: pc_labeled, lr_holder:lr, fortest:0}
+                training_loss, training_acc = sess.run([loss, accu], feed_dict=feed_dict)
+                feed_dict = {x_data: batch_data, y_gt: batch_label_all_with_bias, W:batch_wi, P: pc_labeled, lr_holder:lr, fortest:0}
+                opt_cnn_clust.run(feed_dict = feed_dict)
+                learning_rate = lr
+                if not t ==t_num-1:
+                    if step % l_step == 0 and step >0:
+                        format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
+                        print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
 
-            if t ==t_num-1:
-                if step % c_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
-            if train_ratio == 1:
-                if step % c_step == 0 and step >0:
-                    format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
-                    print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
-            if step % b_step == 0 and step >0:
-                lr = lr * dr
-        
+                if t ==t_num-1:
+                    if step % c_step == 0 and step >0:
+                        format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
+                        print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
+                if train_ratio == 1:
+                    if step % c_step == 0 and step >0:
+                        format_str = ('%s: p %f, step %d, loss = %.2f, learning_rate = %f, training_accu = %f')
+                        print (format_str % (datetime.now(), train_ratio, step, training_loss, learning_rate, training_acc))
+                if step % b_step == 0 and step >0:
+                    lr = lr * dr
+            
         #run_train(trainX,trainY)
-        if seed == 150:
-            if not t == t_num-1:
+        #if seed == 150:
+        if t ==10:
+            path_t0 = "%smodel-t0-p%g-s%d-step%d.ckpt" % (save_path, train_ratio, seed, step)
+            print("t=0,save to path:", path_t0)
+            saver.save(sess, path_t0)
+            #print("all three iteration are done" )
+            #run_test()
+            #break
+      
+        if not t == t_num-1:
+            if not t ==0:
                 if not train_ratio ==1:
                     run_test()
         #if not t ==0:
@@ -407,13 +421,121 @@ with tf.Session(config=config) as sess:
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './unlossfix_test/unlossfix-testDkl-m10000-benchmard%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        txtname = './extension_test/extension-test-fixedsubsetnum-m10000-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
         #pdb.set_trace()
         np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
         un_wholeXYwl.sort(key = lambda x:x[v_num])
         num_k = int(len(un_wholeXYwl)/num_S+1)
         un_batches = [un_wholeXYwl[k:k+num_k] for k in range(0, len(un_wholeXYwl), num_k)]
+        #Ying
+        #fixed number of selected subset, num =3(means choose 4)
+        #cancle the fixed subset number, control the ratio of HS and nonHS
+        #?thoughts: maybe all predicted HS are selected, since HS are lower ones, so maybe I can separate those two and select samples based on numbers
+        un_nhX, un_hX, wi_nh, wi_h, loss_nh, loss_h = separate_unlabel(unX,un_p_label,wi,loss_v)
+        un_h_num = len(un_hX)
+        un_nh_num = len(un_nhX)
+        print("len(un_hX)=", len(un_hX),"len(un_nhX)", len(un_nhX))
+        whole_un_nh = list(zip(un_nhX,wi_nh,loss_nh))
+        whole_un_nh.sort(key = lambda x:x[2])
+        fix_loss = whole_un_nh[4*un_h_num][-1]
+        r = fix_loss
+        
+
+        #r_index = 3
+        #r = un_batches[r_index][-1][v_num]
+        
+        #Ying
+        #Cancle the ISPL and AL part
+
+        #r_al_num = int(len(unX)*al_ratio/(2**t))+1
+        #print("r_al_num = ", r_al_num)
+        #if not r_index ==14:
+        #    r_al = un_batches[-1][-r_al_num][v_num]
+        #    print("r_al = %f" %r_al)
+        #loss_v_zero_number = (loss_v.tolist()).count(0)
+        #if not loss_v_zero_number == 0:
+        #    print("loos_v has %d zeros" % (loss_v_zero_number))
+        #else:
+        #    print("no zero in loss_v")
+        print("r=",r)
+        print('\n')
+        vi_un = np.zeros_like(loss_v)
+
+        #if not un_loss_based == 1:
+        for i in range(len(loss_v)):
+            if loss_v[i] <= r:
+                vi_un[i] = 1
+                #ISPL
+                 #if ifISPL == 1:
+                 #    if not r_index ==14:
+                 #        if loss_v[i] >= r_al:
+                 #            vi_un[i] = -1
+        #else:
+        #    for i in range(len(un_loss1)):
+        #        if un_loss1[i] <= r:
+        #            vi_un[i] =1
+        #        if ISPL ==1:
+        #            if not r_index ==14:
+        #                if un_loss1[i] >= r_al:
+        #                    vi_un[i] = -1
+            
+        unlabel_whole = list(zip(unX,un_p_label))
+        unlabel_fortrain = []
+        w_un_fortrain = []
+        unlabel_al = []
+        w_un_al =[]
+        for i in range(len(vi_un)):
+            if vi_un[i] == 1:
+                unlabel_fortrain.append(unlabel_whole[i])
+                w_un_fortrain.append(wi[i])
+            #ISPL, inverse labels for low confident samples
+            #if ifISPL ==1:
+            #    if vi_un[i] == -1:
+            #        unlabel_al.append(unlabel_whole[i])
+            #        w_un_al.append(wi[i])
+        #ISPL, label and weight assignment
+      #  if ifISPL ==1:
+      #      if not r_index ==14:
+      #          print("unlabel_al number:", len(unlabel_al))
+      #          unlabel_al = data_flatten2(unlabel_al)
+      #          X_al,Y_al = data_split_sencond(unlabel_al)
+      #          Y_al_ones = np.ones_like(Y_al)
+      #          Y_al_new = Y_al_ones - Y_al
+      #          w_al_ones = np.ones_like(w_un_al)
+      #          w_al_new = w_al_ones
+      #          unlabel_al_new = list(zip(X_al,Y_al_new))
+      #          newdata_fortrain = train_original + unlabel_fortrain+unlabel_al_new
+      #          print("%d unlabeled data for ISPL are used" % (len(unlabel_al_new)))
+      #      else:
+        newdata_fortrain = train_original + unlabel_fortrain
+        print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
+        newdata_fortrain = data_flatten2(newdata_fortrain)
+        newdataX, newdataY = data_split_sencond(newdata_fortrain)
+        len_trainingX = len(trainX)
+            #if not r_index ==14:
+                #w_original
+                #w_new = np.ones(len_trainingX).tolist() + w_un_fortrain + w_un_al
+            #else:
+                #w_new = np.ones(len_trainingX).tolist() + w_un_fortrain
+        #else:
+            #newdata_fortrain = train_original + unlabel_fortrain
+            #newdata_fortrain = data_flatten2(newdata_fortrain)
+            #newdataX, newdataY = data_split_sencond(newdata_fortrain)
+            #len_trainingX = len(trainX)
+            #print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
+        w_new = np.ones(len_trainingX).tolist() + w_un_fortrain
+        print("%d data totally are used" % (len(newdataX)))
+        trainX1 = np.array(newdataX)
+        trainY1 = np.array(newdataY)
+        weight_train = np.array(data_flatten2(w_new))
+        print("round ok at",t+1)
+        print('\n')
+print("training time is(seconds):", time.time()-t1)
+    
+ 
+        
+'''
         un_for_r = []
         un_for_r_acc = []
         bar = Bar('training model with unlabeled data to define r', max=num_S)
@@ -480,90 +602,5 @@ with tf.Session(config=config) as sess:
                 r_max = un_for_r_acc[i]
                 r_index = i
         print("r_max =%f, r_index =%d" % (r_max,r_index))
-        r = un_batches[r_index][-1][v_num]
-        r_al_num = int(len(unX)*al_ratio/(2**t))+1
-        print("r_al_num = ", r_al_num)
-        if not r_index ==14:
-            r_al = un_batches[-1][-r_al_num][v_num]
-            print("r_al = %f" %r_al)
-        loss_v_zero_number = (loss_v.tolist()).count(0)
-        if not loss_v_zero_number == 0:
-            print("loos_v has %d zeros" % (loss_v_zero_number))
-        else:
-            print("no zero in loss_v")
-        print("r=",r)
-        print('\n')
-        vi_un = np.zeros_like(loss_v)
-
-        if not un_loss_based == 1:
-            for i in range(len(loss_v)):
-                 if loss_v[i] <= r:
-                    vi_un[i] = 1
-                #ISPL
-                 if ifISPL == 1:
-                     if not r_index ==14:
-                         if loss_v[i] >= r_al:
-                             vi_un[i] = -1
-        else:
-            for i in range(len(un_loss1)):
-                if un_loss1[i] <= r:
-                    vi_un[i] =1
-                if ISPL ==1:
-                    if not r_index ==14:
-                        if un_loss1[i] >= r_al:
-                            vi_un[i] = -1
-            
-        unlabel_whole = list(zip(unX,un_p_label))
-        unlabel_fortrain = []
-        w_un_fortrain = []
-        unlabel_al = []
-        w_un_al =[]
-        for i in range(len(vi_un)):
-            if vi_un[i] == 1:
-                unlabel_fortrain.append(unlabel_whole[i])
-                w_un_fortrain.append(wi[i])
-            #ISPL, inverse labels for low confident samples
-            if ifISPL ==1:
-                if vi_un[i] == -1:
-                    unlabel_al.append(unlabel_whole[i])
-                    w_un_al.append(wi[i])
-        #ISPL, label and weight assignment
-        if ifISPL ==1:
-            if not r_index ==14:
-                print("unlabel_al number:", len(unlabel_al))
-                unlabel_al = data_flatten2(unlabel_al)
-                X_al,Y_al = data_split_sencond(unlabel_al)
-                Y_al_ones = np.ones_like(Y_al)
-                Y_al_new = Y_al_ones - Y_al
-                w_al_ones = np.ones_like(w_un_al)
-                w_al_new = w_al_ones
-                unlabel_al_new = list(zip(X_al,Y_al_new))
-                newdata_fortrain = train_original + unlabel_fortrain+unlabel_al_new
-                print("%d unlabeled data for ISPL are used" % (len(unlabel_al_new)))
-            else:
-                newdata_fortrain = train_original + unlabel_fortrain
-            print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
-            newdata_fortrain = data_flatten2(newdata_fortrain)
-            newdataX, newdataY = data_split_sencond(newdata_fortrain)
-            len_trainingX = len(trainX)
-            if not r_index ==14:
-                #w_original
-                w_new = np.ones(len_trainingX).tolist() + w_un_fortrain + w_un_al
-            else:
-                w_new = np.ones(len_trainingX).tolist() + w_un_fortrain
-        else:
-            newdata_fortrain = train_original + unlabel_fortrain
-            newdata_fortrain = data_flatten2(newdata_fortrain)
-            newdataX, newdataY = data_split_sencond(newdata_fortrain)
-            len_trainingX = len(trainX)
-            print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
-            w_new = np.ones(len_trainingX).tolist() + w_un_fortrain
-        print("%d data totally are used" % (len(newdataX)))
-        trainX1 = np.array(newdataX)
-        trainY1 = np.array(newdataY)
-        weight_train = np.array(data_flatten2(w_new))
-        print("round ok at",t+1)
-        print('\n')
-print("training time is(seconds):", time.time()-t1)
-    
-    
+'''
+   
