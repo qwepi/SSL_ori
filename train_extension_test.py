@@ -92,7 +92,7 @@ bs     = 32   #training batch size
 c_step = 1000 #display step
 b_step = 3200 #lr decay step
 t_step = 10000 #total step
-num_S = 10 #unlabeled data subset number
+num_S = 15 #unlabeled data subset number
 t_num = 4 #iteration round
 al_ratio = 0.01 #ratio parameter for ISPL data selecting
 v_num = 4 # use whether un_loss(3) or v_loss(4) to sort unlabeled data subset
@@ -329,7 +329,7 @@ with tf.Session(config=config) as sess:
         #if not t ==0:
             #run_test()
         if t ==t_num-1:
-            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25-S10.ckpt" % (save_path, train_ratio, seed, step)
+            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25-notinversebugfixed.ckpt" % (save_path, train_ratio, seed, step)
             print("save to path:", path)
             saver.save(sess, path)
             print("all three iteration are done" )
@@ -445,16 +445,27 @@ with tf.Session(config=config) as sess:
         whole_un_h.sort(key = lambda x:x[-1])
         num_inverse = int(un_h_num * 0.25)
         print("num_inverse=",num_inverse)
-        whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
         #whole_un_nh.sort(key = lambda x:x[-1])
         #pdb.set_trace()
+        #h inverse
         inverse_whole_un_h = whole_un_h[(0-num_inverse):]
         inverse_unX, inverse_unY_useless, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
-        print("len(inverse_unX)=",len(inverse_unX))
-        inverse_Y = np.zeros(len(inverse_unX))
-        inverse_whole_un_h = list(zip(inverse_unX,inverse_Y,inverse_weight,inverse_vloss))
-        whole_un_nh_new = inverse_whole_un_h + whole_un_nh
-        whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)]
+        print("len(inverse_unX_h)=",len(inverse_unX))
+        inverse_Y_h = np.zeros(len(inverse_unX))
+        
+        #nh inverse 
+        whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
+        whole_un_nh.sort(key = lambda x:x[-1])
+        num_inverse_nh = 10 
+        inverse_whole_un_nh = whole_un_nh[-num_inverse_nh:]
+        inverse_Xnh, inverse_Ynh_useless, inverse_weight_nh, inverse_vloss_nh = data_split_fourclass(inverse_whole_un_nh)
+        inverse_Y_nh = np.ones(len(inverse_Xnh))
+        
+        #get two parts
+        inverse_whole_un_h = list(zip(inverse_unX,inverse_Y_h,inverse_weight,inverse_vloss))
+        whole_un_nh_new = inverse_whole_un_h + whole_un_nh[0:len(whole_un_nh)-num_inverse_nh]
+        inverse_whole_un_nh = list(zip(inverse_Xnh, inverse_Y_nh,inverse_weight_nh,inverse_vloss_nh))
+        whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)] + inverse_whole_un_nh
         whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
         whole_un_afterinverse.sort(key = lambda x:x[-1])
         
