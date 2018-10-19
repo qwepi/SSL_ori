@@ -329,7 +329,7 @@ with tf.Session(config=config) as sess:
         #if not t ==0:
             #run_test()
         if t ==t_num-1:
-            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25-notinversebugfixed.ckpt" % (save_path, train_ratio, seed, step)
+            path = "%smodel-p%g-s%d-step%d.ckpt" % (save_path, train_ratio, seed, step)
             print("save to path:", path)
             saver.save(sess, path)
             print("all three iteration are done" )
@@ -421,7 +421,7 @@ with tf.Session(config=config) as sess:
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './extension_test/extension-test-hs-inverse-0.25-m10000-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        txtname = './extension_test/extension-test-bothin-h0.15n0.0001-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
         #pdb.set_trace()
         np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
@@ -443,23 +443,39 @@ with tf.Session(config=config) as sess:
         #inverse hs
         whole_un_h = list(zip(un_hX,un_h_Y,wi_h,vloss_h))
         whole_un_h.sort(key = lambda x:x[-1])
-        num_inverse = int(un_h_num * 0.25)
+        num_inverse = int(un_h_num * 0.15)
         print("num_inverse=",num_inverse)
-        #whole_un_nh.sort(key = lambda x:x[-1])
-        #pdb.set_trace()
-        #h inverse
-        inverse_whole_un_h = whole_un_h[(0-num_inverse):]
-        inverse_unX, inverse_unY_useless, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
-        print("len(inverse_unX_h)=",len(inverse_unX))
-        inverse_Y_h = np.zeros(len(inverse_unX))
         
-        #nh inverse 
+        #nh inverse number
         whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
         whole_un_nh.sort(key = lambda x:x[-1])
-        num_inverse_nh = 10 
-        inverse_whole_un_nh = whole_un_nh[-num_inverse_nh:]
-        inverse_Xnh, inverse_Ynh_useless, inverse_weight_nh, inverse_vloss_nh = data_split_fourclass(inverse_whole_un_nh)
-        inverse_Y_nh = np.ones(len(inverse_Xnh))
+        num_inverse_nh = int(un_nh_num*0.001) 
+       #whole_un_nh.sort(key = lambda x:x[-1])
+        #pdb.set_trace()
+        
+        #h inverse
+        if not num_inverse == 0:
+            inverse_whole_un_h = whole_un_h[(0-num_inverse):]
+            inverse_unX, inverse_unY_useless, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
+            print("len(inverse_unX_h)=",len(inverse_unX))
+            inverse_Y_h = np.zeros(len(inverse_unX))
+            inverse_whole_un_h = list(zip(inverse_unX,inverse_Y_h,inverse_weight,inverse_vloss))
+            whole_un_nh_new = inverse_whole_un_h + whole_un_nh[0:len(whole_un_nh)-num_inverse_nh]
+        else:
+            whole_un_nh_new = whole_un_nh[0:len(whole_un_nh)-num_inverse_nh]
+
+        #nh inverse 
+        if not num_inverse_nh == 0:
+            inverse_whole_un_nh = whole_un_nh[-num_inverse_nh:]
+            inverse_Xnh, inverse_Ynh_useless, inverse_weight_nh, inverse_vloss_nh = data_split_fourclass(inverse_whole_un_nh)
+            inverse_Y_nh = np.ones(len(inverse_Xnh))
+            inverse_whole_un_nh = list(zip(inverse_Xnh, inverse_Y_nh,inverse_weight_nh,inverse_vloss_nh))
+            whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)] + inverse_whole_un_nh
+        else:
+            whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)]
+        
+        whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
+        whole_un_afterinverse.sort(key = lambda x:x[-1])
         
         #get two parts
         inverse_whole_un_h = list(zip(inverse_unX,inverse_Y_h,inverse_weight,inverse_vloss))
