@@ -92,7 +92,7 @@ bs     = 32   #training batch size
 c_step = 1000 #display step
 b_step = 3200 #lr decay step
 t_step = 10000 #total step
-num_S = 15 #unlabeled data subset number
+num_S = 10 #unlabeled data subset number
 t_num = 4 #iteration round
 al_ratio = 0.01 #ratio parameter for ISPL data selecting
 v_num = 4 # use whether un_loss(3) or v_loss(4) to sort unlabeled data subset
@@ -259,8 +259,8 @@ with tf.Session(config=config) as sess:
         print('%d round start' % (t+1))
         sess.run(global_variables_initializer)
         lr = 0.001
-        #if t ==0:
-            #saver.restore(sess, model_path)
+        if t ==10:
+            saver.restore(sess, model_path)
         if t ==t_num-1:
             maxitr = t_step
         if train_ratio ==1:
@@ -329,7 +329,7 @@ with tf.Session(config=config) as sess:
         #if not t ==0:
             #run_test()
         if t ==t_num-1:
-            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25.ckpt" % (save_path, train_ratio, seed, step)
+            path = "%smodel-p%g-s%d-step%d-hs-inverse-0.25-S10.ckpt" % (save_path, train_ratio, seed, step)
             print("save to path:", path)
             saver.save(sess, path)
             print("all three iteration are done" )
@@ -443,17 +443,18 @@ with tf.Session(config=config) as sess:
         #inverse hs
         whole_un_h = list(zip(un_hX,un_h_Y,wi_h,vloss_h))
         whole_un_h.sort(key = lambda x:x[-1])
-        num_inverse = un_h_num * 0.25 /(t+1)
+        num_inverse = int(un_h_num * 0.25)
         print("num_inverse=",num_inverse)
         whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
         #whole_un_nh.sort(key = lambda x:x[-1])
-        inverse_whole_un_h = whole_un_h[-num_inverse:-1]
-        inverse_unX, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
+        #pdb.set_trace()
+        inverse_whole_un_h = whole_un_h[(0-num_inverse):]
+        inverse_unX, inverse_unY_useless, inverse_weight, inverse_vloss = data_split_fourclass(inverse_whole_un_h)
         print("len(inverse_unX)=",len(inverse_unX))
         inverse_Y = np.zeros(len(inverse_unX))
         inverse_whole_un_h = list(zip(inverse_unX,inverse_Y,inverse_weight,inverse_vloss))
         whole_un_nh_new = inverse_whole_un_h + whole_un_nh
-        whole_un_h_new = whole_un_h[0:un_h_num-num_inverse]
+        whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)]
         whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
         whole_un_afterinverse.sort(key = lambda x:x[-1])
         
@@ -537,7 +538,7 @@ with tf.Session(config=config) as sess:
         
 
         #r_index = 3
-        #r = un_batches[r_index][-1][v_num]
+        r = un_batches[r_index][-1][-1]
         
         #Ying
         #Cancle the ISPL and AL part
@@ -555,26 +556,19 @@ with tf.Session(config=config) as sess:
         print("r=",r)
         print('\n')
         vi_un = np.zeros_like(loss_v)
+        
 
-        #if not un_loss_based == 1:
-        for i in range(len(loss_v)):
-            if loss_v[i] <= r:
+        #Ying
+        #part label is inversed, need to adjust unlabel_whole
+        unX_new, un_p_label_new, weight_new, vloss_new = data_split_fourclass(whole_un_afterinverse)
+        unlabel_whole = list(zip(unX_new,un_p_label_new))
+
+
+        for i in range(len(vloss_new)):
+            if vloss_new[i] <= r:
                 vi_un[i] = 1
-                #ISPL
-                 #if ifISPL == 1:
-                 #    if not r_index ==14:
-                 #        if loss_v[i] >= r_al:
-                 #            vi_un[i] = -1
-        #else:
-        #    for i in range(len(un_loss1)):
-        #        if un_loss1[i] <= r:
-        #            vi_un[i] =1
-        #        if ISPL ==1:
-        #            if not r_index ==14:
-        #                if un_loss1[i] >= r_al:
-        #                    vi_un[i] = -1
-            
-        unlabel_whole = list(zip(unX,un_p_label))
+        
+        #unlabel_whole = list(zip(unX,un_p_label))
         unlabel_fortrain = []
         w_un_fortrain = []
         unlabel_al = []
@@ -582,26 +576,8 @@ with tf.Session(config=config) as sess:
         for i in range(len(vi_un)):
             if vi_un[i] == 1:
                 unlabel_fortrain.append(unlabel_whole[i])
-                w_un_fortrain.append(wi[i])
-            #ISPL, inverse labels for low confident samples
-            #if ifISPL ==1:
-            #    if vi_un[i] == -1:
-            #        unlabel_al.append(unlabel_whole[i])
-            #        w_un_al.append(wi[i])
-        #ISPL, label and weight assignment
-      #  if ifISPL ==1:
-      #      if not r_index ==14:
-      #          print("unlabel_al number:", len(unlabel_al))
-      #          unlabel_al = data_flatten2(unlabel_al)
-      #          X_al,Y_al = data_split_sencond(unlabel_al)
-      #          Y_al_ones = np.ones_like(Y_al)
-      #          Y_al_new = Y_al_ones - Y_al
-      #          w_al_ones = np.ones_like(w_un_al)
-      #          w_al_new = w_al_ones
-      #          unlabel_al_new = list(zip(X_al,Y_al_new))
-      #          newdata_fortrain = train_original + unlabel_fortrain+unlabel_al_new
-      #          print("%d unlabeled data for ISPL are used" % (len(unlabel_al_new)))
-      #      else:
+                w_un_fortrain.append(weight_new[i])
+
         newdata_fortrain = train_original + unlabel_fortrain
         print("%d unlabeled data for spl are used" % (len(unlabel_fortrain)))
         newdata_fortrain = data_flatten2(newdata_fortrain)
