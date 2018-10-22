@@ -93,7 +93,7 @@ c_step = 1000 #display step
 b_step = 3200 #lr decay step
 t_step = 10000 #total step
 num_S = 15 #unlabeled data subset number
-t_num = 4 #iteration round
+t_num = 3 #iteration round
 al_ratio = 0.01 #ratio parameter for ISPL data selecting
 v_num = 4 # use whether un_loss(3) or v_loss(4) to sort unlabeled data subset
 un_loss_based = 0 # use whether un_loss(1) or v_loss(0) to sort unlabeled data subset
@@ -421,7 +421,7 @@ with tf.Session(config=config) as sess:
         un_wholeXYwl = list(zip(unX,un_p_label,wi,un_loss1,un_v_loss))
         un_wholetest = list(zip(un_p_label,unY,wi,un_loss1,un_v_loss))
         #print("un_wholetest=",un_wholetest)
-        txtname = './extension_test/extension-test-bothin-h0.15n0.0001-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
+        txtname = './extension_test/extension-test-bothin-h0.1n0.0001-decrease2t-round3-b%d-p%g-s%d-t%d.txt'%(bB,train_ratio,seed,t)
         #pdb.set_trace()
         np.savetxt(txtname,un_wholetest)
         print("un_wholetest save to ", txtname)
@@ -434,6 +434,7 @@ with tf.Session(config=config) as sess:
         #cancle the fixed subset number, control the ratio of HS and nonHS
         #?thoughts: maybe all predicted HS are selected, since HS are lower ones, so maybe I can separate those two and select samples based on numbers
         #try inverse HS 1/4
+        #inverse_decrease, but add inverse part into training, not into subset
         un_nhX, un_hX, wi_nh, wi_h, vloss_nh, vloss_h = separate_unlabel(unX,un_p_label,wi,loss_v)
         un_h_num = len(un_hX)
         un_nh_num = len(un_nhX)
@@ -443,13 +444,17 @@ with tf.Session(config=config) as sess:
         #inverse hs
         whole_un_h = list(zip(un_hX,un_h_Y,wi_h,vloss_h))
         whole_un_h.sort(key = lambda x:x[-1])
-        num_inverse = int(un_h_num * 0.15)
+        if un_h_num <16:
+            num_inverse = 0
+        else:
+            num_inverse = int(un_h_num * 0.1/(2**t))
         print("num_inverse=",num_inverse)
         
         #nh inverse number
         whole_un_nh = list(zip(un_nhX,un_nh_Y,wi_nh,vloss_nh))
         whole_un_nh.sort(key = lambda x:x[-1])
-        num_inverse_nh = int(un_nh_num*0.001) 
+        num_inverse_nh = int(un_nh_num*0.001)
+        print("num_inverse_nh=",num_inverse_nh)
        #whole_un_nh.sort(key = lambda x:x[-1])
         #pdb.set_trace()
         
@@ -478,12 +483,12 @@ with tf.Session(config=config) as sess:
         whole_un_afterinverse.sort(key = lambda x:x[-1])
         
         #get two parts
-        inverse_whole_un_h = list(zip(inverse_unX,inverse_Y_h,inverse_weight,inverse_vloss))
-        whole_un_nh_new = inverse_whole_un_h + whole_un_nh[0:len(whole_un_nh)-num_inverse_nh]
-        inverse_whole_un_nh = list(zip(inverse_Xnh, inverse_Y_nh,inverse_weight_nh,inverse_vloss_nh))
-        whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)] + inverse_whole_un_nh
-        whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
-        whole_un_afterinverse.sort(key = lambda x:x[-1])
+        #inverse_whole_un_h = list(zip(inverse_unX,inverse_Y_h,inverse_weight,inverse_vloss))
+        #whole_un_nh_new = inverse_whole_un_h + whole_un_nh[0:len(whole_un_nh)-num_inverse_nh]
+        #inverse_whole_un_nh = list(zip(inverse_Xnh, inverse_Y_nh,inverse_weight_nh,inverse_vloss_nh))
+        #whole_un_h_new = whole_un_h[0:(un_h_num-num_inverse)] + inverse_whole_un_nh
+        #whole_un_afterinverse = whole_un_h_new + whole_un_nh_new
+        #whole_un_afterinverse.sort(key = lambda x:x[-1])
         
 
         num_k = int(len(whole_un_afterinverse)/num_S+1)
